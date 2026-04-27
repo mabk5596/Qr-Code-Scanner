@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner to Excel - Custom Blue</title>
+    
+    <!-- Scripts for Functionality -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        /* --- JQUERY UI BASE STYLE --- */
+        .ui-helper-hidden { display: none; }
+        .ui-helper-reset { margin: 0; padding: 0; border: 0; outline: 0; line-height: 1.3; text-decoration: none; font-size: 100%; list-style: none; }
+        .ui-widget { font-family: Trebuchet MS, Tahoma, Verdana, Arial, sans-serif; font-size: 1.1em; }
+        .ui-widget-content { border: 1px solid #dddddd; background: #eeeeee; color: #333333; }
+        .ui-widget-header { border: 1px solid #1d4b86; background: #1d4b86; color: #ffffff; font-weight: bold; padding: 12px; text-align: center;}
+        .ui-corner-all { border-radius: 4px; }
+        
+        /* --- UPDATED BUTTON STYLE (YOUR BLUE COLOR) --- */
+        .ui-state-default { 
+            border: 1px solid #14355f; 
+            background: #1d4b86; /* Your Color */
+            font-weight: bold; 
+            color: #ffffff;      /* White text for contrast */
+            padding: 10px 20px; 
+            cursor: pointer;
+            transition: background 0.2s; /* Smooth color change */
+        }
+
+        /* Hover effect: slightly lighter blue */
+        .ui-state-hover { 
+            border: 1px solid #1d4b86; 
+            background: #2b69ba; 
+            color: #ffffff;
+        }
+
+        /* Layout Adjustments */
+        #main-container { max-width: 600px; margin: 20px auto; padding: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #reader { width: 100%; margin-bottom: 20px; border: 1px solid #ddd; overflow: hidden; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .button-set { margin: 20px 0; text-align: center; display: flex; gap: 10px; justify-content: center; }
+        
+        /* Error message style */
+        #error-msg { color: #cd0a0a; font-size: 0.8em; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body class="ui-widget">
+
+    <div id="main-container" class="ui-widget-content ui-corner-all">
+        <div class="ui-widget-header ui-corner-all">
+            BARCODE & QR SCANNER
+        </div>
+
+        <div style="padding: 20px;">
+            <!-- Camera Scanner -->
+            <div id="reader"></div>
+            <div id="error-msg"></div>
+
+            <div class="button-set">
+                <button id="exportBtn" class="ui-state-default ui-corner-all" onclick="exportToExcel()">
+                    Download Excel
+                </button>
+                <button class="ui-state-default ui-corner-all" onclick="clearData()" style="background: #f6f6f6; color: #1d4b86; border: 1px solid #ccc;">
+                    Clear List
+                </button>
+            </div>
+
+            <!-- Scanned Table -->
+            <table id="resultTable">
+                <thead>
+                    <tr class="ui-widget-header" style="background: #555; border: 1px solid #444;">
+                        <th>Value</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="scannedList">
+                    <!-- Data will appear here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const scannedData = [];
+
+        // 1. Initialize Scanner
+        const html5QrCode = new Html5QrcodeScanner("reader", { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0
+        });
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Prevent duplicate scans within 2 seconds
+            const lastScan = scannedData[scannedData.length - 1];
+            if (lastScan && lastScan.Value === decodedText) return;
+
+            const now = new Date();
+            const timestamp = now.toLocaleDateString() + " " + now.toLocaleTimeString();
+
+            const newEntry = { Value: decodedText, Timestamp: timestamp };
+            scannedData.push(newEntry);
+
+            const tbody = document.getElementById('scannedList');
+            const row = tbody.insertRow(0);
+            row.innerHTML = `<td>${decodedText}</td><td>${timestamp}</td>`;
+        }
+
+        // Handle errors (like permission denied)
+        function onScanFailure(error) {
+            if (error.includes("NotAllowedError") || error.includes("Permission denied")) {
+                document.getElementById('error-msg').innerText = "Camera access denied. Please enable camera permissions in site settings and refresh.";
+            }
+        }
+
+        html5QrCode.render(onScanSuccess, onScanFailure);
+
+        // 2. Export Functionality
+        function exportToExcel() {
+            if (scannedData.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+            const worksheet = XLSX.utils.json_to_sheet(scannedData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Scans");
+            XLSX.writeFile(workbook, "Scanned_Data.xlsx");
+        }
+
+        function clearData() {
+            if(confirm("Clear all scanned data?")) {
+                scannedData.length = 0;
+                document.getElementById('scannedList').innerHTML = "";
+            }
+        }
+
+        // Add hover effect manually for the jQuery UI class
+        document.querySelectorAll('.ui-state-default').forEach(btn => {
+            btn.addEventListener('mouseenter', () => btn.classList.add('ui-state-hover'));
+            btn.addEventListener('mouseleave', () => btn.classList.remove('ui-state-hover'));
+        });
+    </script>
+</body>
+</html>
