@@ -3,214 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner</title>
+    <title>Scanner Pro - Custom Blue</title>
     
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
     <style>
-        .ui-helper-hidden { display: none; }
-        .ui-widget { font-family: Trebuchet MS, Tahoma, Verdana, Arial, sans-serif; font-size: 1.1em; }
-        .ui-widget-content { border: 1px solid #dddddd; background: #eeeeee; color: #333333; }
-        .ui-widget-header { border: 1px solid #1d4b86; background: #1d4b86; color: #ffffff; font-weight: bold; padding: 12px; text-align: center;}
-        .ui-corner-all { border-radius: 4px; }
+        .ui-widget { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .ui-widget-header { border: 1px solid #1d4b86; background: #1d4b86; color: #ffffff; font-weight: bold; padding: 12px; text-align: center; border-radius: 4px 4px 0 0;}
+        .ui-widget-content { border: 1px solid #dddddd; background: #ffffff; color: #333333; border-radius: 4px; }
         
         .ui-state-default { 
             border: 1px solid #14355f; 
             background: #1d4b86; 
             font-weight: bold; 
             color: #ffffff;
-            padding: 10px 20px; 
+            padding: 12px 24px; 
             cursor: pointer;
-            transition: background 0.2s;
+            border-radius: 4px;
+            transition: 0.2s;
         }
 
-        .ui-state-hover { 
-            border: 1px solid #1d4b86; 
-            background: #2b69ba; 
-            color: #ffffff;
-        }
+        .ui-state-hover { background: #2b69ba; }
 
-        #main-container { max-width: 800px; margin: 20px auto; padding: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        #reader { width: 100%; margin-bottom: 20px; border: 1px solid #ddd; overflow: hidden; border-radius: 4px; background: #000; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; font-size: 0.8em; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        .button-set { margin: 20px 0; text-align: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+        #main-container { max-width: 900px; margin: 20px auto; padding: 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        #reader { width: 100%; border: none; background: #000; }
         
-        /* Toggle Switch Styling */
-        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #1d4b86; }
-        input:checked + .slider:before { transform: translateX(26px); }
-        .toggle-label { font-size: 0.9em; font-weight: bold; color: #1d4b86; }
+        /* Table Styling */
+        .table-container { padding: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f8f9fa; color: #1d4b86; border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        td { border: 1px solid #dee2e6; padding: 12px; font-size: 14px; vertical-align: top; }
+        tr:nth-child(even) { background-color: #fcfcfc; }
 
-        #error-msg { color: #cd0a0a; font-size: 0.8em; text-align: center; margin-top: 10px; }
+        /* Controls */
+        .controls { display: flex; flex-wrap: wrap; gap: 15px; padding: 20px; align-items: center; justify-content: center; background: #f1f4f8; }
+        
+        /* Toggle Switch */
+        .switch-wrapper { display: flex; align-items: center; gap: 10px; font-size: 0.9em; font-weight: bold; color: #1d4b86; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #1d4b86; }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        #status-msg { text-align: center; color: #1d4b86; font-weight: bold; height: 20px; margin-bottom: 5px; font-size: 0.85em; }
     </style>
 </head>
 <body class="ui-widget">
 
-    <div id="main-container" class="ui-widget-content ui-corner-all">
-        <div class="ui-widget-header ui-corner-all">
-            BARCODE & QR SCANNER
-        </div>
+    <div id="main-container" class="ui-widget-content">
+        <div class="ui-widget-header">BARCODE & QR DATA EXTRACTOR</div>
 
-        <div style="padding: 20px;">
-            <div id="reader"></div>
-            <div id="error-msg"></div>
-
-            <div class="button-set">
-                <!-- Toggle for Data Grab -->
-                <div style="display: flex; align-items: center; gap: 10px; margin-right: 20px;">
-                    <span class="toggle-label">Internal Data Grab:</span>
-                    <label class="switch">
-                        <input type="checkbox" id="dataGrabToggle">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <button id="exportBtn" class="ui-state-default ui-corner-all" onclick="exportToExcel()">
-                    Download Excel
-                </button>
-                <button class="ui-state-default ui-corner-all" onclick="clearData()" style="background: #f6f6f6; color: #1d4b86; border: 1px solid #ccc;">
-                    Clear List
-                </button>
+        <!-- Scanner -->
+        <div id="reader"></div>
+        
+        <div class="controls">
+            <div class="switch-wrapper">
+                <span>Grab Web Data (Titles)</span>
+                <label class="switch">
+                    <input type="checkbox" id="dataGrabToggle">
+                    <span class="slider"></span>
+                </label>
             </div>
 
+            <button class="ui-state-default" onclick="exportToExcel()">Download Excel</button>
+            <button class="ui-state-default" onclick="clearData()" style="background: #e9ecef; color: #333; border-color: #ccc;">Clear All</button>
+        </div>
+
+        <div id="status-msg">Ready to scan</div>
+
+        <div class="table-container">
             <table id="resultTable">
                 <thead>
-                    <tr class="ui-widget-header" style="background: #555; border: 1px solid #444;">
-                        <th>Value</th>
-                        <th>Extracted Info</th>
-                        <th>Timestamp</th>
+                    <tr>
+                        <th style="width: 30%;">Scanned Value</th>
+                        <th style="width: 45%;">Extracted Info (Web Title)</th>
+                        <th style="width: 25%;">Timestamp</th>
                     </tr>
                 </thead>
-                <tbody id="scannedList"></tbody>
+                <tbody id="scannedList">
+                    <!-- Data rows injected here -->
+                </tbody>
             </table>
         </div>
     </div>
 
     <script>
-        const scannedData = [];
-        let isScanning = false;
+        let scannedData = [];
+        let isPaused = false; // For cooldown
 
-        // 1. Audio Logic (Beep)
-        function playSuccessTone() {
+        // 1. SOUND LOGIC
+        function playTone(freq = 880, duration = 0.15) {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            
-            oscillator.start();
-            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2);
-            oscillator.stop(audioCtx.currentTime + 0.2);
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+            osc.stop(audioCtx.currentTime + duration);
         }
 
-        // 2. Data Grab Logic
-        async function fetchPageData(url) {
-            if (!url.startsWith('http')) return "Not a link";
+        // 2. DATA GRAB LOGIC (Using a Proxy to fix CORS)
+        async function fetchWebTitle(url) {
+            if (!url.startsWith('http')) return "Not a valid URL";
             
             try {
-                // We use a timeout to prevent the app from hanging
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-                const response = await fetch(url, { signal: controller.signal });
-                const text = await response.text();
+                // We use allorigins.win as a proxy to get around CORS blocks
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('Proxy error');
                 
-                // Parse HTML to find title
-                const doc = new DOMParser().parseFromString(text, "text/html");
-                const title = doc.querySelector('title')?.innerText || "No Title Found";
-                return title.trim();
+                const data = await response.json();
+                const html = data.contents;
+                
+                // Extract Title using Regex
+                const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+                return match ? match[1].trim() : "No Title Found on Page";
             } catch (err) {
-                console.error(err);
-                return "CORS Blocked / Request Error";
+                return "Access Restricted or Page Unavailable";
             }
         }
 
-        // 3. Initialize Scanner
+        // 3. SCANNER LOGIC
         const html5QrCode = new Html5QrcodeScanner("reader", { 
             fps: 10, 
             qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0
         });
 
-        async function onScanSuccess(decodedText, decodedResult) {
-            // Prevent duplicate scans within 3 seconds
-            const lastScan = scannedData[scannedData.length - 1];
-            if (lastScan && lastScan.Value === decodedText && (Date.now() - lastScan.rawTime < 3000)) return;
+        async function onScanSuccess(decodedText) {
+            if (isPaused) return;
 
-            playSuccessTone();
-            
+            // CHECK FOR DUPLICATES
+            const isDuplicate = scannedData.some(item => item.Value === decodedText);
+            if (isDuplicate) {
+                document.getElementById('status-msg').innerText = "⚠️ Duplicate detected - Ignoring";
+                playTone(220, 0.3); // Lower warning tone
+                return;
+            }
+
+            // START COOLDOWN
+            isPaused = true;
+            document.getElementById('status-msg').innerText = "⌛ Processing...";
+            playTone(880, 0.1); // High success tone
+
             const now = new Date();
             const timestamp = now.toLocaleDateString() + " " + now.toLocaleTimeString();
             const grabEnabled = document.getElementById('dataGrabToggle').checked;
             
-            let extractedInfo = "N/A";
-            
-            // UI Feedback: Insert row immediately
-            const tbody = document.getElementById('scannedList');
-            const row = tbody.insertRow(0);
-            row.innerHTML = `<td>${decodedText}</td><td id="info-${scannedData.length}">Scanning...</td><td>${timestamp}</td>`;
+            let extractedInfo = "N/A (Toggle Off)";
 
+            // Add to internal array
+            const newEntry = { 
+                Value: decodedText, 
+                ExtractedInfo: "Loading...", 
+                Timestamp: timestamp 
+            };
+            scannedData.unshift(newEntry);
+            renderTable();
+
+            // Fetch Web Data if enabled
             if (grabEnabled && decodedText.startsWith('http')) {
-                extractedInfo = await fetchPageData(decodedText);
-                document.getElementById(`info-${scannedData.length}`).innerText = extractedInfo;
+                extractedInfo = await fetchWebTitle(decodedText);
+                newEntry.ExtractedInfo = extractedInfo;
+                renderTable(); // Re-render with new data
             } else {
-                extractedInfo = "Grab Disabled/Not URL";
-                document.getElementById(`info-${scannedData.length}`).innerText = extractedInfo;
+                newEntry.ExtractedInfo = grabEnabled ? "Not a Link" : "Grab Disabled";
+                renderTable();
             }
 
-            scannedData.push({ 
-                Value: decodedText, 
-                ExtractedInfo: extractedInfo, 
-                Timestamp: timestamp,
-                rawTime: Date.now() 
+            // End Cooldown after 3 seconds
+            setTimeout(() => {
+                isPaused = false;
+                document.getElementById('status-msg').innerText = "Ready to scan";
+            }, 3000);
+        }
+
+        // 4. UI RENDERING
+        function renderTable() {
+            const tbody = document.getElementById('scannedList');
+            tbody.innerHTML = ""; // Clear existing
+
+            scannedData.forEach(item => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${item.Value}</td>
+                    <td><small>${item.ExtractedInfo}</small></td>
+                    <td>${item.Timestamp}</td>
+                `;
             });
         }
 
-        function onScanFailure(error) {
-            if (error.includes("NotAllowedError")) {
-                document.getElementById('error-msg').innerText = "Camera access denied.";
-            }
-        }
-
-        html5QrCode.render(onScanSuccess, onScanFailure);
-
-        // 4. Export Functionality
+        // 5. EXPORT & UTILS
         function exportToExcel() {
-            if (scannedData.length === 0) {
-                alert("No data to export.");
-                return;
-            }
-            // Clean data for export (remove rawTime)
-            const exportArray = scannedData.map(({Value, ExtractedInfo, Timestamp}) => ({Value, ExtractedInfo, Timestamp}));
-            
-            const worksheet = XLSX.utils.json_to_sheet(exportArray);
+            if (scannedData.length === 0) return alert("No data!");
+            const worksheet = XLSX.utils.json_to_sheet(scannedData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Scans");
             XLSX.writeFile(workbook, "Scanned_Data.xlsx");
         }
 
         function clearData() {
-            if(confirm("Clear all scanned data?")) {
-                scannedData.length = 0;
-                document.getElementById('scannedList').innerHTML = "";
+            if(confirm("Delete all list data?")) {
+                scannedData = [];
+                renderTable();
             }
         }
 
-        // Hover effects
-        document.querySelectorAll('.ui-state-default').forEach(btn => {
-            btn.addEventListener('mouseenter', () => btn.classList.add('ui-state-hover'));
-            btn.addEventListener('mouseleave', () => btn.classList.remove('ui-state-hover'));
-        });
+        html5QrCode.render(onScanSuccess);
     </script>
 </body>
 </html>
