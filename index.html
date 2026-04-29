@@ -90,147 +90,138 @@
         </div>
     </div>
 
-    <script>
-        let scannedData = [];
-        let isPaused = false; // For cooldown
-
-        // 1. SOUND LOGIC
-        function playTone(freq = 880, duration = 0.15) {
+    
+       <script>
+        const scannedData = [];
+        
+        // 1. Audio Logic
+        function playSuccessTone() {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            osc.start();
-            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
-            osc.stop(audioCtx.currentTime + duration);
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2);
+            oscillator.stop(audioCtx.currentTime + 0.2);
         }
 
-        // 2. DATA GRAB LOGIC (Using a Proxy to fix CORS)
-        // 2. Updated Data Grab Logic with CORS Proxy
-        async function fetchPageData(url) {
-            if (!url.startsWith('http')) return "Not a link";
-            
+        // 2. Optimized Data Grab (Non-blocking)
+        async function fetchPageData(url, rowIndex) {
+            const cellId = `info-cell-${rowIndex}`;
+            const targetCell = document.getElementById(cellId);
+
             try {
-                // Using AllOrigins proxy to bypass CORS restrictions
+                // Using a different proxy as backup
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
                 
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased timeout
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
                 const response = await fetch(proxyUrl, { signal: controller.signal });
-                if (!response.ok) throw new Error('Network response was not ok');
-                
                 const data = await response.json();
-                const htmlContent = data.contents;
                 
-                // Parse HTML
-                const doc = new DOMParser().parseFromString(htmlContent, "text/html");
-                
-                // Specific logic for Haj portal or general title
-                // We try to find the Title, or specific Header tags where data usually sits
-                let title = doc.querySelector('title')?.innerText || "";
-                let mainHeading = doc.querySelector('h1, h2, .person-name')?.innerText || "";
-                
-                let result = (title + " " + mainHeading).trim();
-                
-                return result || "Page loaded, but no text found";
-                
+                if (data.contents) {
+                    const doc = new DOMParser().parseFromString(data.contents, "text/html");
+                    // Try to find Haj specific data or Page Title
+                    const title = doc.querySelector('title')?.innerText || "No Title";
+                    const result = title.replace("::", "").trim();
+                    
+                    // Update UI and Array
+                    targetCell.innerText = result;
+                    scannedData[rowIndex].ExtractedInfo = result;
+                } else {
+                    throw new Error("Empty response");
+                }
             } catch (err) {
-                console.error(err);
-                return "Access Denied (CORS/Private Portal)";
+                targetCell.innerText = "CORS/Private Link";
+                scannedData[rowIndex].ExtractedInfo = "Access Denied";
             }
         }
 
-        // 3. SCANNER LOGIC
+        // 3. Initialize Scanner
         const html5QrCode = new Html5QrcodeScanner("reader", { 
             fps: 10, 
             qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0
+            rememberLastUsedCamera: true
         });
 
-        async function onScanSuccess(decodedText) {
-            if (isPaused) return;
-
-            // CHECK FOR DUPLICATES
-            const isDuplicate = scannedData.some(item => item.Value === decodedText);
-            if (isDuplicate) {
-                document.getElementById('status-msg').innerText = "⚠️ Duplicate detected - Ignoring";
-                playTone(220, 0.3); // Lower warning tone
-                return;
+        function onScanSuccess(decodedText, decodedResult) {
+            // Prevent duplicate scans within 5 seconds
+            const nowTime = Date.now();
+            const lastScan = scannedData[0]; // Check the most recent scan
+            if (lastScan && lastScan.Value === decodedText && (nowTime - lastScan.rawTime < 5000)) {
+                return; 
             }
 
-            // START COOLDOWN
-            isPaused = true;
-            document.getElementById('status-msg').innerText = "⌛ Processing...";
-            playTone(880, 0.1); // High success tone
-
+            playSuccessTone();
+            
             const now = new Date();
             const timestamp = now.toLocaleDateString() + " " + now.toLocaleTimeString();
             const grabEnabled = document.getElementById('dataGrabToggle').checked;
             
-            let extractedInfo = "N/A (Toggle Off)";
-
-            // Add to internal array
-            const newEntry = { 
-                Value: decodedText, 
-                ExtractedInfo: "Loading...", 
-                Timestamp: timestamp 
+            // Create a record object
+            const newEntry = {
+                Value: decodedText,
+                ExtractedInfo: "Waiting...",
+                Timestamp: timestamp,
+                rawTime: nowTime
             };
+
+            // Add to start of array
             scannedData.unshift(newEntry);
-            renderTable();
+            const currentIndex = 0; // It's at the top
 
-            // Fetch Web Data if enabled
-            if (grabEnabled && decodedText.startsWith('http')) {
-                extractedInfo = await fetchWebTitle(decodedText);
-                newEntry.ExtractedInfo = extractedInfo;
-                renderTable(); // Re-render with new data
-            } else {
-                newEntry.ExtractedInfo = grabEnabled ? "Not a Link" : "Grab Disabled";
-                renderTable();
-            }
-
-            // End Cooldown after 3 seconds
-            setTimeout(() => {
-                isPaused = false;
-                document.getElementById('status-msg').innerText = "Ready to scan";
-            }, 3000);
-        }
-
-        // 4. UI RENDERING
-        function renderTable() {
+            // Update UI Table immediately
             const tbody = document.getElementById('scannedList');
-            tbody.innerHTML = ""; // Clear existing
+            const row = tbody.insertRow(0);
+            row.innerHTML = `
+                <td style="word-break: break-all; max-width: 200px;">${decodedText}</td>
+                <td id="info-cell-0">---</td>
+                <td>${timestamp}</td>
+            `;
 
-            scannedData.forEach(item => {
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td>${item.Value}</td>
-                    <td><small>${item.ExtractedInfo}</small></td>
-                    <td>${item.Timestamp}</td>
-                `;
+            // Update all IDs of existing rows to match their new index
+            Array.from(tbody.rows).forEach((r, i) => {
+                const infoCell = r.cells[1];
+                infoCell.id = `info-cell-${i}`;
             });
+
+            // Trigger data fetch in background (DO NOT 'AWAIT' HERE)
+            if (grabEnabled && decodedText.startsWith('http')) {
+                document.getElementById(`info-cell-0`).innerText = "Fetching...";
+                fetchPageData(decodedText, 0);
+            } else {
+                const msg = grabEnabled ? "Not a URL" : "Grab Disabled";
+                document.getElementById(`info-cell-0`).innerText = msg;
+                scannedData[0].ExtractedInfo = msg;
+            }
         }
 
-        // 5. EXPORT & UTILS
+        html5QrCode.render(onScanSuccess);
+
+        // 4. Export & Clear
         function exportToExcel() {
-            if (scannedData.length === 0) return alert("No data!");
-            const worksheet = XLSX.utils.json_to_sheet(scannedData);
+            if (scannedData.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+            const exportArray = scannedData.map(({Value, ExtractedInfo, Timestamp}) => ({Value, ExtractedInfo, Timestamp}));
+            const worksheet = XLSX.utils.json_to_sheet(exportArray);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Scans");
             XLSX.writeFile(workbook, "Scanned_Data.xlsx");
         }
 
         function clearData() {
-            if(confirm("Delete all list data?")) {
-                scannedData = [];
-                renderTable();
+            if(confirm("Clear all scanned data?")) {
+                scannedData.length = 0;
+                document.getElementById('scannedList').innerHTML = "";
             }
         }
-
-        html5QrCode.render(onScanSuccess);
     </script>
 </body>
 </html>
